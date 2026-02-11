@@ -6,14 +6,16 @@ from config import USERNAME, PASSWORD
 from state import save_successful_mark
 
 
+# --- HELPER FUNCTIONS ---
+
 async def random_sleep(min_seconds=1.0, max_seconds=3.0):
-    """Sleeps for a random amount of time to mimic human thinking/reading."""
+    """Sleeps for a random amount of time to mimic human thinking."""
     ms = random.uniform(min_seconds, max_seconds)
     await asyncio.sleep(ms)
 
 
 async def human_type(page, selector, text):
-    """Types text with random delays (slower variance)."""
+    """Types text with random delays."""
     if isinstance(selector, str):
         await page.focus(selector)
     else:
@@ -21,47 +23,59 @@ async def human_type(page, selector, text):
 
     for char in text:
         await page.keyboard.type(char)
-        # Slower typing: 0.1s to 0.3s per key
         await asyncio.sleep(random.uniform(0.1, 0.3))
-
-        # Pause after typing a field (like a human checking their input)
     await random_sleep(0.5, 1.5)
 
 
 async def human_click(page, selector):
-    """Moves mouse to element, hovers briefly, then clicks with delay."""
-    # If selector is a Locator object, use it directly; otherwise create one
+    """Moves mouse to element, hovers, then clicks with delay."""
     if isinstance(selector, str):
         loc = page.locator(selector)
     else:
         loc = selector
 
-    # 1. Hover first (visual cue of mouse movement)
+    # 1. Hover first (visual cue)
     await loc.hover()
 
-    # 2. Small hesitation before clicking
+    # 2. Hesitate
     await asyncio.sleep(random.uniform(0.2, 0.7))
 
     # 3. Click
     await loc.click()
 
-    # 4. Post-click pause (reaction time)
+    # 4. React
     await random_sleep(1.0, 2.0)
 
 
 async def take_screenshot(page, status_label):
+    """Takes a screenshot and RETURNS the filename."""
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"moodle_{status_label}_{timestamp}.png"
     await page.screenshot(path=filename, full_page=True)
     print(f"📸 Screenshot saved: {filename}")
+    return filename
 
+
+# --- MAIN LOGIC ---
 
 async def run_attendance_bot(moodle_id):
+    """
+    Runs the browser automation.
+    RETURNS: A dictionary { 'status': str, 'message': str, 'screenshot': str|None }
+    """
     attendance_url = f"https://moodle.runi.ac.il/2026/mod/attendance/view.php?id={moodle_id}"
 
+    # Default return state (Error)
+    result_report = {
+        "status": "error",
+        "message": "❌ Unknown error occurred.",
+        "screenshot": None
+    }
+
     async with async_playwright() as p:
-        # Launch browser
+        # headless=False lets you watch it (Manual Mode)
         browser = await p.chromium.launch(headless=False)
+
         context = await browser.new_context(
             viewport={"width": 1280, "height": 800},
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -69,9 +83,9 @@ async def run_attendance_bot(moodle_id):
         page = await context.new_page()
 
         try:
-            print(f"🚀 Navigating to Attendance URL: {attendance_url}")
+            print(f"🚀 Navigating to: {attendance_url}")
             await page.goto(attendance_url)
-            await random_sleep(2.0, 4.0)  # Wait for page to fully settle
+            await random_sleep(2.0, 4.0)
 
             # --- LOGIN HANDLING ---
             try:
@@ -83,7 +97,7 @@ async def run_attendance_bot(moodle_id):
                 pass
 
             if await page.locator("input[type='password']").is_visible(timeout=5000):
-                print("🔒 Login required. Entering credentials...")
+                print("🔒 Login required...")
 
                 user_input = page.get_by_placeholder("שם משתמש")
                 if not await user_input.is_visible(): user_input = page.get_by_placeholder("User Name")
@@ -104,8 +118,6 @@ async def run_attendance_bot(moodle_id):
 
             # --- ATTENDANCE HANDLING ---
             print("👀 Looking for 'Submit attendance' button...")
-
-            # Add a "thinking" pause before clicking submit
             await random_sleep(1.5, 3.0)
 
             submit_link = page.get_by_text("Submit attendance", exact=False).or_(page.get_by_text("עדכון נוכחות")).or_(
@@ -128,21 +140,53 @@ async def run_attendance_bot(moodle_id):
                     await human_click(page, save_btn)
 
                     print("🏆 Attendance marked successfully.")
+
+                    # Log to JSON
                     save_successful_mark(moodle_id)
 
-                    await take_screenshot(page, "SUCCESS")
+                    # Capture Success Screenshot
+                    shot_path = await take_screenshot(page, "SUCCESS")
+
+                    # Success Result
+                    result_report = {
+                        "status": "success",
+                        "message": f"✅ Successfully marked attendance for ID {moodle_id}.",
+                        "screenshot": shot_path
+                    }
                 else:
-                    print("❌ Found submit page, but no 'Present' option.")
-                    await take_screenshot(page, "ERROR_NO_RADIO")
+                    print("❌ Error: No radio button found.")
+                    shot_path = await take_screenshot(page, "ERROR_NO_RADIO")
+                    result_report = {
+                        "status": "error",
+                        "message": "❌ 'Submit' clicked, but 'Present' option not found.",
+                        "screenshot": shot_path
+                    }
 
             else:
-                print("ℹ️ Button NOT found. (Class likely not started).")
-                await take_screenshot(page, "DEBUG_NO_BUTTON")
+                print("ℹ️ Button NOT found.")
+                shot_path = await take_screenshot(page, "DEBUG_NO_BUTTON")
+                result_report = {
+                    "status": "skipped",
+                    "message": "ℹ️ 'Submit Attendance' button not found (Class likely not started).",
+                    "screenshot": shot_path
+                }
 
         except Exception as e:
-            print(f"❌ Script Error: {e}")
-            await take_screenshot(page, "CRITICAL_ERROR")
+            print(f"❌ Critical Error: {e}")
+            try:
+                shot_path = await take_screenshot(page, "CRITICAL_ERROR")
+            except:
+                shot_path = None
+
+            result_report = {
+                "status": "error",
+                "message": f"❌ Critical Script Error: {str(e)}",
+                "screenshot": shot_path
+            }
 
         finally:
             print("👋 Closing browser.")
             await browser.close()
+
+            # RETURN the report so main.py or telegram_bot.py can use it
+            return result_report
