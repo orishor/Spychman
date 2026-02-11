@@ -9,7 +9,7 @@ from playwright.async_api import async_playwright
 load_dotenv()
 USERNAME = os.getenv("MOODLE_USER")
 PASSWORD = os.getenv("MOODLE_PASS")
-ATTENDANCE_URL = "https://moodle.runi.ac.il/2026/mod/attendance/view.php?id=49909"
+ATTENDANCE_URL = "https://moodle.runi.ac.il/2026/mod/attendance/view.php?id=41318"
 
 
 async def human_type(page, selector, text):
@@ -73,7 +73,7 @@ async def run_bot():
                 await human_type(page, pass_input, PASSWORD)
 
                 # Click Login
-                login_btn = page.get_by_role("button", name="התחבר")
+                login_btn = page.get_by_role("button", name="כניסה")
                 if not await login_btn.is_visible(): login_btn = page.get_by_role("button", name="Log on")
                 await login_btn.click()
                 await page.wait_for_load_state("networkidle")
@@ -82,7 +82,7 @@ async def run_bot():
             print("👀 Looking for 'Submit attendance' button...")
 
             # We look for the button, but we don't crash if it's missing
-            submit_link = page.get_by_text("Submit attendance", exact=False).or_(page.get_by_text("הגשת נוכחות"))
+            submit_link = page.get_by_text("Submit attendance", exact=False).or_(page.get_by_text("עדכון נוכחות"))
 
             if await submit_link.is_visible():
                 print("🎯 Button FOUND! Clicking...")
@@ -102,7 +102,7 @@ async def run_bot():
                     await save_btn.click()
                     print("✅ Attendance marked successfully.")
 
-                    # SUCCESS SCREENSHOT
+                    # SUCCESS SCREENSHOTf
                     await take_screenshot(page, "SUCCESS")
                 else:
                     print("❌ Found submit page, but no 'Present' option.")
