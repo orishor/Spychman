@@ -5,36 +5,40 @@ from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# Import the core logic from main.py
 from main import run_process
 
-# Setup logging (optional, good for debugging)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-# Ensure we cast the ID to integer for comparison
 ALLOWED_USER_ID = int(os.getenv("TELEGRAM_CHAT_ID"))
 
-# The Button Layout
 KEYBOARD = [["🚀 Run Attendance Check"]]
 
+# --- ADD THIS NEW FUNCTION ---
+async def post_init(application: Application):
+    """This runs automatically the second the bot starts on your computer."""
+    print("📲 Pushing the button to your phone...")
+    try:
+        await application.bot.send_message(
+            chat_id=ALLOWED_USER_ID,
+            text="🤖 Spychman is online and listening. Ready when you are!",
+            reply_markup=ReplyKeyboardMarkup(KEYBOARD, resize_keyboard=True, is_persistent=True)
+        )
+    except Exception as e:
+        print(f"Failed to send startup message: {e}")
+# -----------------------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends the welcome message with the button."""
     user = update.effective_user
     if user.id != ALLOWED_USER_ID:
-        await update.message.reply_text("⛔ Access Denied.")
         return
-
     await update.message.reply_text(
-        "👋 Hi Ori! I am Spychman.\nPress the button below to check for class.",
-        reply_markup=ReplyKeyboardMarkup(KEYBOARD, resize_keyboard=True)
+        "👋 Hi Ori! I am Spychman.\nPress the button below.",
+        reply_markup=ReplyKeyboardMarkup(KEYBOARD, resize_keyboard=True, is_persistent=True)
     )
 
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the button press."""
     user = update.effective_user
     if user.id != ALLOWED_USER_ID:
         return
@@ -43,40 +47,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "🚀 Run Attendance Check":
         status_msg = await update.message.reply_text("🕵️‍♂️ Checking schedule and running bot...")
-
         try:
-            # --- CALL MAIN.PY ---
             result = await run_process()
-
-            # 1. Send Text Report
             await update.message.reply_text(f"📝 Report:\n{result['message']}")
-
-            # 2. Send Screenshot (if exists)
             if result.get('screenshot'):
                 with open(result['screenshot'], 'rb') as photo:
                     await update.message.reply_photo(photo=photo)
-
-            # Delete the "Checking..." message to keep chat clean
             await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=status_msg.message_id)
-
         except Exception as e:
             await update.message.reply_text(f"❌ Critical Error: {str(e)}")
 
-
 def main():
-    """Start the bot."""
     if not TOKEN or not ALLOWED_USER_ID:
-        print("❌ Error: TELEGRAM_TOKEN or TELEGRAM_CHAT_ID missing in .env")
+        print("❌ Error: Missing credentials.")
         return
 
-    app = Application.builder().token(TOKEN).build()
+    # --- UPDATE THIS LINE TO INCLUDE post_init ---
+    app = Application.builder().token(TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("🤖 Telegram Bot is running... (Press Ctrl+C to stop)")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
