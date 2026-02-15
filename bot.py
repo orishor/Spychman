@@ -127,6 +127,15 @@ async def run_attendance_bot(moodle_id):
                 print("🎯 Button FOUND! Clicking...")
                 await human_click(page, submit_link)
 
+                # --- THE FIX: WAIT FOR PAGE TO LOAD ---
+                print("⏳ Waiting for the attendance page to load...")
+                try:
+                    # Wait up to 5 seconds for ANY radio button to appear
+                    await page.locator("input[type='radio']").first.wait_for(timeout=5000)
+                except:
+                    pass  # Handle missing radio gracefully below
+                # --------------------------------------
+
                 present_radio = page.get_by_label("Present").or_(page.get_by_label("נוכח/ת"))
                 if not await present_radio.is_visible():
                     present_radio = page.locator("input[type='radio']").first
@@ -154,11 +163,11 @@ async def run_attendance_bot(moodle_id):
                         "screenshot": shot_path
                     }
                 else:
-                    print("❌ Error: No radio button found.")
+                    print("❌ Error: No radio button found after waiting.")
                     shot_path = await take_screenshot(page, "ERROR_NO_RADIO")
                     result_report = {
                         "status": "error",
-                        "message": "❌ 'Submit' clicked, but 'Present' option not found.",
+                        "message": "❌ 'Submit' clicked, but 'Present' option not found on the next page.",
                         "screenshot": shot_path
                     }
 
