@@ -24,6 +24,75 @@ Built with **Playwright**, it mimics human behavior to navigate Moodle's interfa
 * **Evidence Collection:** Every successful (or failed) attempt captures a **full-page screenshot** for your peace of mind.
 * **Israel Timezone Support:** Hardcoded for **`Asia/Jerusalem`** to ensure the schedule matches campus time perfectly.
 
+```mermaid
+graph RL
+    %% ==========================================
+    %% RIGHT SIDE (Input & Logic Blocks)
+    %% ==========================================
+    subgraph InputLogicBlock [Input & Internal Logic]
+        direction TB
+
+        subgraph External_Sources [External Data]
+            direction RL
+            ICS([Moodle Calendar .ics])
+            ENV[".env (Credentials)"]
+        end
+
+        subgraph Spychman_Engine [Spychman Internal Logic]
+            direction RL
+            SCH[scheduler.py - The Brain]
+            MAP{Course Mapping?}
+            BOT[bot.py - Playwright Engine]
+            LOG[(attendance_log.json)]
+        
+            SCH --> MAP
+            MAP -- "Match Found" --> BOT
+            BOT --> LOG
+        end
+        
+        ICS --> SCH
+        ENV --> BOT
+    end
+
+    %% ==========================================
+    %% LEFT SIDE (Action & Output Blocks)
+    %% ==========================================
+    subgraph ActionOutputBlock [Action & Output]
+        direction TB
+
+        subgraph Action_Phase [Action & Output]
+            direction RL
+            MOODLE[[Moodle Website]]
+            TELE[telegram_bot.py]
+        end
+
+        USER((You))
+        
+        MOODLE -- "Success & Screenshot" --> BOT
+        BOT --> TELE
+        TELE -- "Push Notification" --> USER
+    end
+
+    %% ==========================================
+    %% MAIN FLOW CONNECTIONS
+    %% ==========================================
+    BOT --> MOODLE
+    USER -- "Manual Trigger" --> TELE
+    TELE --> BOT
+
+    %% ==========================================
+    %% SAFE STYLING (GitHub Compatible)
+    %% ==========================================
+    style ICS fill:#fff,stroke:#003366,stroke-width:2px
+    style ENV fill:#fff,stroke:#003366,stroke-width:2px
+    style SCH fill:#fff,stroke:#003366,stroke-width:2px
+    style MAP fill:#fff,stroke:#003366,stroke-width:2px
+    style BOT fill:#fff,stroke:#003366,stroke-width:2px
+    style LOG fill:#fff,stroke:#003366,stroke-width:2px
+    style MOODLE fill:#fff,stroke:#003366,stroke-width:2px
+    style TELE fill:#fff,stroke:#003366,stroke-width:2px
+    style USER fill:#fff,stroke:#28a745,stroke-width:2px
+```
 ---
 
 ## **🛠️ Tech Stack**
