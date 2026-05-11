@@ -1,8 +1,17 @@
+<p align="center">
+<img src="https://github.com/user-attachments/assets/4fa8ba53-fdc8-493a-ac50-b887c782df1d" alt="Gemini_Generated_Image" width="300" />
+</p>
+
+
 # **Spychman 🕵️‍♂️**
 
 **Spychman** is a robust, **Python-powered** automation tool designed for students at **Reichman University**. It integrates with your **Moodle account** and academic calendar to automatically (or remotely) handle attendance marking.
 
 Built with **Playwright**, it mimics human behavior to navigate Moodle's interface, bypasses standard detection with **randomized interactions**, and reports back to you via **Telegram** with photographic evidence.
+
+<p align="center">
+<img src="https://github.com/user-attachments/assets/e25ef9c3-a23b-4d6c-b425-f2ec6af49376" alt="Mockup" width=250/>
+</p>
 
 ---
 
